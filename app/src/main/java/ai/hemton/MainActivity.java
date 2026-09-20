@@ -25,7 +25,7 @@ import java.util.concurrent.Executors;
 
 public class MainActivity extends Activity {
 
-    private TextView status;
+    private TextView status;private android.speech.tts.TextToSpeech textToSpeech;
 
     private static final int REQUEST_RECORD_AUDIO = 100;
     private static final int REQUEST_SPEECH = 101;
@@ -37,7 +37,14 @@ public class MainActivity extends Activity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
-
+textToSpeech = new android.speech.tts.TextToSpeech(
+        this,
+        status -> {
+            if (status == android.speech.tts.TextToSpeech.SUCCESS) {
+                textToSpeech.setLanguage(java.util.Locale.US);
+            }
+        }
+);
         status = findViewById(R.id.status);
         Button listenButton = findViewById(R.id.listenButton);
 
@@ -237,10 +244,15 @@ public class MainActivity extends Activity {
                                 "I didn't get a response."
                         );
 
-                runOnUiThread(() ->
-                        status.setText(reply)
-                );
-
+runOnUiThread(() -> {
+    status.setText(reply);
+    textToSpeech.speak(
+            reply,
+            android.speech.tts.TextToSpeech.QUEUE_FLUSH,
+            null,
+            "hemton_reply"
+    );
+});
                 connection.disconnect();
 
             } catch (Exception e) {
@@ -256,7 +268,10 @@ public class MainActivity extends Activity {
 
     @Override
     protected void onDestroy() {
-
+if (textToSpeech != null) {
+    textToSpeech.stop();
+    textToSpeech.shutdown();
+}
         executor.shutdown();
 
         super.onDestroy();
