@@ -34,8 +34,7 @@
         android:layout_marginBottom="80dp"
         android:text="TAP TO TALK"
         android:textSize="16sp" />
-<ai.hemton.AppleAnimationView
-    android:id="@+id/appleAnimation"
+<ai.hemton.OrbView
     android:layout_width="match_parent"
     android:layout_height="match_parent" />
 </FrameLayout>
