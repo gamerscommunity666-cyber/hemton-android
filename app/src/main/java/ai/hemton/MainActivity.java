@@ -8,13 +8,30 @@ import android.content.Intent;
 import android.speech.RecognizerIntent;
 import android.widget.Button;
 import android.widget.TextView;
+
+import org.json.JSONArray;
+import org.json.JSONObject;
+
+import java.io.BufferedReader;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.io.OutputStream;
+import java.net.HttpURLConnection;
+import java.net.URL;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 public class MainActivity extends Activity {
 
     private TextView status;
+
     private static final int REQUEST_RECORD_AUDIO = 100;
     private static final int REQUEST_SPEECH = 101;
+
+    private final ExecutorService executor =
+            Executors.newSingleThreadExecutor();
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -28,12 +45,15 @@ public class MainActivity extends Activity {
     }
 
     private void startListening() {
+
         if (checkSelfPermission(Manifest.permission.RECORD_AUDIO)
                 != PackageManager.PERMISSION_GRANTED) {
+
             requestPermissions(
                     new String[]{Manifest.permission.RECORD_AUDIO},
                     REQUEST_RECORD_AUDIO
             );
+
             return;
         }
 
@@ -41,18 +61,34 @@ public class MainActivity extends Activity {
     }
 
     private void openSpeechRecognizer() {
-        Intent intent = new Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH);
+
+        Intent intent =
+                new Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH);
+
         intent.putExtra(
                 RecognizerIntent.EXTRA_LANGUAGE_MODEL,
                 RecognizerIntent.LANGUAGE_MODEL_FREE_FORM
         );
-        intent.putExtra(RecognizerIntent.EXTRA_PROMPT, "Hey! I'm listening...");
+
+        intent.putExtra(
+                RecognizerIntent.EXTRA_PROMPT,
+                "Hey! I'm listening..."
+        );
 
         try {
+
             status.setText("Listening...");
-            startActivityForResult(intent, REQUEST_SPEECH);
+
+            startActivityForResult(
+                    intent,
+                    REQUEST_SPEECH
+            );
+
         } catch (Exception e) {
-            status.setText("Speech recognition unavailable");
+
+            status.setText(
+                    "Speech recognition unavailable"
+            );
         }
     }
 
@@ -62,7 +98,11 @@ public class MainActivity extends Activity {
             int resultCode,
             Intent data) {
 
-        super.onActivityResult(requestCode, resultCode, data);
+        super.onActivityResult(
+                requestCode,
+                resultCode,
+                data
+        );
 
         if (requestCode == REQUEST_SPEECH
                 && resultCode == RESULT_OK
@@ -74,10 +114,151 @@ public class MainActivity extends Activity {
                     );
 
             if (results != null && !results.isEmpty()) {
-                status.setText(results.get(0));
+
+                String spokenText = results.get(0);
+
+                status.setText("Thinking...");
+
+                askHemton(spokenText);
+
             } else {
-                status.setText("I didn't hear that.");
+
+                status.setText(
+                        "I didn't hear that."
+                );
             }
         }
+    }
+
+    private void askHemton(String message) {
+
+        executor.execute(() -> {
+
+            try {
+
+                URL url = new URL(
+                        "https://hemton-ai.vercel.app/api/chat"
+                );
+
+                HttpURLConnection connection =
+                        (HttpURLConnection) url.openConnection();
+
+                connection.setRequestMethod("POST");
+                connection.setRequestProperty(
+                        "Content-Type",
+                        "application/json"
+                );
+
+                connection.setDoOutput(true);
+
+                JSONObject body = new JSONObject();
+
+                JSONArray messages = new JSONArray();
+
+                JSONObject userMessage =
+                        new JSONObject();
+
+                userMessage.put(
+                        "role",
+                        "user"
+                );
+
+                userMessage.put(
+                        "content",
+                        message
+                );
+
+                messages.put(userMessage);
+
+                body.put(
+                        "messages",
+                        messages
+                );
+
+                body.put(
+                        "memory",
+                        new JSONArray()
+                );
+
+                OutputStream output =
+                        connection.getOutputStream();
+
+                output.write(
+                        body.toString()
+                                .getBytes(StandardCharsets.UTF_8)
+                );
+
+                output.close();
+
+                int responseCode =
+                        connection.getResponseCode();
+
+                InputStream inputStream;
+
+                if (responseCode >= 200
+                        && responseCode < 300) {
+
+                    inputStream =
+                            connection.getInputStream();
+
+                } else {
+
+                    inputStream =
+                            connection.getErrorStream();
+                }
+
+                BufferedReader reader =
+                        new BufferedReader(
+                                new InputStreamReader(
+                                        inputStream
+                                )
+                        );
+
+                StringBuilder response =
+                        new StringBuilder();
+
+                String line;
+
+                while ((line = reader.readLine()) != null) {
+
+                    response.append(line);
+                }
+
+                reader.close();
+
+                JSONObject result =
+                        new JSONObject(
+                                response.toString()
+                        );
+
+                String reply =
+                        result.optString(
+                                "reply",
+                                "I didn't get a response."
+                        );
+
+                runOnUiThread(() ->
+                        status.setText(reply)
+                );
+
+                connection.disconnect();
+
+            } catch (Exception e) {
+
+                runOnUiThread(() ->
+                        status.setText(
+                                "HEMTON connection error"
+                        )
+                );
+            }
+        });
+    }
+
+    @Override
+    protected void onDestroy() {
+
+        executor.shutdown();
+
+        super.onDestroy();
     }
 }
