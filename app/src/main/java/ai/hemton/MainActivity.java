@@ -37,6 +37,11 @@ public class MainActivity extends Activity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
+android.view.View orb = findViewById(R.id.orb);
+android.view.animation.Animation pulse =
+        android.view.animation.AnimationUtils.loadAnimation(
+                this, R.anim.orb_pulse);
+orb.startAnimation(pulse);
 textToSpeech = new android.speech.tts.TextToSpeech(
         this,
         status -> {
